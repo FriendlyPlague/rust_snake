@@ -159,7 +159,7 @@ impl Snake {
             Direction::Down => {self.head.1 += 1;},
         }
         if self.head.0 < 0 || self.head.0 >= GAME_WIDTH ||
-            self.head.1 < 0 || self.head.1 >= GAME_HEIGHT {return 2;}
+            self.head.1 < 0 || self.head.1 >= GAME_HEIGHT || self.body.contains(&self.head) {return 2;}
         if self.head != food_pos {
             self.body.pop();
             return 0;
