@@ -1,18 +1,19 @@
+use std::{thread,time::Duration};
 use std::collections::VecDeque;
-use rand::prelude::*;
-use macroquad::{window,shapes,color, input, time, text};
+use macroquad::{window,shapes,color, input, time, text,rand};
 use indexmap::IndexMap;
 
-const GAME_WIDTH: i32 = 30;
-const GAME_HEIGHT: i32 = 30;
+const GAME_WIDTH: i32 = 32;
+const GAME_HEIGHT: i32 = 18;
 const SPEED: f64 = 0.1;
 const Y_OFFSET: f32 = 50.0;
+const X_OFFSET: f32 = 30.0;
 
 fn window_conf() -> window::Conf {
     window::Conf {
         window_title: "Snake".to_owned(),
-        window_width: 700,
-        window_height: 750,
+        window_width: 1280,
+        window_height: 720,
         window_resizable: false,
         ..Default::default()
     }
@@ -22,15 +23,15 @@ fn window_conf() -> window::Conf {
 async fn main() {
     let mut game_objects: IndexMap<(i32,i32),ObjectName> = IndexMap::new();
     let mut snake: Snake = Snake {
-        head: (15,19),
+        head: (15,8), // starting location for snake
         direction: Direction::Up,
         body: VecDeque::new(),
     };
-    game_objects.insert((15,19), ObjectName::SnakeHead);
+    game_objects.insert((15,8), ObjectName::SnakeHead);
     // used to scale up game to better fit screen size
     let scale = {
-        let x_scale: f32 = window::screen_width()/GAME_WIDTH as f32;
-        let y_scale: f32 = window::screen_height()/GAME_HEIGHT as f32;
+        let x_scale: f32 = window::screen_width()/(GAME_WIDTH+1) as f32;
+        let y_scale: f32 = window::screen_height()/(GAME_HEIGHT+2) as f32;
         let scale = {
             if x_scale < y_scale {x_scale}
             else {y_scale}};
@@ -55,14 +56,13 @@ async fn main() {
         }
         if !food_exists {
             loop {
-                let rnd_num = rand::thread_rng().gen_range(0..GAME_WIDTH*GAME_HEIGHT) as i32;
+                let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT) as i32;
                 let x = rnd_num%GAME_WIDTH;
                 let y = rnd_num/GAME_WIDTH;
                 if !game_objects.contains_key(&(x, y)) {
                     game_objects.insert((x,y), ObjectName::Food);
                     break;
                 }
-                println!("generate pellet");
             }
             food_exists = true;
         }
@@ -87,24 +87,26 @@ async fn main() {
         // render
         window::clear_background(color::BEIGE);
         if !game_over {
-            text::draw_text(&score.to_string(), 350.0, 35.0, 60.0, color::BLACK);
-            for x in 0..GAME_WIDTH {
-                for y in 0..GAME_HEIGHT {
-                    shapes::draw_rectangle_lines((x as f32)*scale, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
+            text::draw_text(&score.to_string(), window::screen_width()/2.0, 35.0, 60.0, color::BLACK);
+            for y in 0..GAME_HEIGHT {
+                for x in 0..GAME_WIDTH {
+                    shapes::draw_rectangle_lines((x as f32)*scale+X_OFFSET, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
                 }
             }
         }
         else {
-            text::draw_text("YOU DIED!", 200.0, 250.0, 100.0, color::RED);
-            text::draw_text(&format!("Score: {}",score.to_string()), 200.0, 350.0, 100.0, color::BLACK);
+            text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
+            text::draw_text(&format!("Score: {}",score.to_string()), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
         }
         for (k,v) in &game_objects {
             match v {
-                ObjectName::SnakeHead | ObjectName::SnakeSeg => {shapes::draw_rectangle((k.0 as f32)*scale, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);},
-                ObjectName::Food => {shapes::draw_rectangle((k.0 as f32)*scale, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::YELLOW);},
+                ObjectName::SnakeHead | ObjectName::SnakeSeg => {shapes::draw_rectangle((k.0 as f32)*scale+X_OFFSET, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);},
+                ObjectName::Food => {shapes::draw_rectangle((k.0 as f32)*scale+X_OFFSET, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::YELLOW);},
             }
         }
         window::next_frame().await;
+        // sleeps
+        thread::sleep(Duration::from_millis(12));
     }
 }
 
