@@ -25,11 +25,12 @@ enum State {
     StartMenu,
     SnakeLoop,
     GameOver,
+    ExitGame,
 }
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut state = State::SnakeLoop;
-    let mut score: i32 = 1;
+    let mut score: i32 = 0;
     let scale: f32 = {
         let x_scale: f32 = window::screen_width()/GAME_WIDTH as f32 - X_OFFSET*2.0/GAME_WIDTH as f32;
         let y_scale: f32 = window::screen_height()/GAME_HEIGHT as f32 - Y_OFFSET*2.0/GAME_HEIGHT as f32;
@@ -38,58 +39,72 @@ async fn main() {
             else {y_scale}};
         scale
     };
-    match state {
-        State::SnakeLoop => {
-        let mut snake: Snake = Snake {..Default::default()};
-        let mut food: Food = Food {..Default::default()};
-        let mut last_time = time::get_time();
-        let mut new_direction: Direction = Direction::Left;
-        loop {
-            //Proccess input
-            match input::get_last_key_pressed() {
-                Some(input::KeyCode::Left) => new_direction = Direction::Left,
-                Some(input::KeyCode::Right) => new_direction = Direction::Right,
-                Some(input::KeyCode::Up) => new_direction = Direction::Up,
-                Some(input::KeyCode::Down) => new_direction = Direction::Down,
-                _ => (),
-            };
-            if (time::get_time() - last_time) > SPEED {
-                snake.set_direction(&new_direction);
-                match snake.move_forward((food.x, food.y)) {
-                    0 => (),
-                    1 => {
-                        food = Food {..Default::default()};
-                        score += 1;},
-                    2 => { println!("went out of bounds");
-                        state = State::GameOver;
-                        break;},
-                    _ => panic!("move_forward returned unexpected number"),
+    loop {
+        match state {
+            State::SnakeLoop => {
+                let mut snake: Snake = Snake {..Default::default()};
+                let mut food: Food = Food {..Default::default()};
+                let mut last_time = time::get_time();
+                let mut new_direction: Direction = Direction::Left;
+                loop {
+                    //Proccess input
+                    match input::get_last_key_pressed() {
+                        Some(input::KeyCode::Left) => new_direction = Direction::Left,
+                        Some(input::KeyCode::Right) => new_direction = Direction::Right,
+                        Some(input::KeyCode::Up) => new_direction = Direction::Up,
+                        Some(input::KeyCode::Down) => new_direction = Direction::Down,
+                        Some(input::KeyCode::Escape) => {state = State::ExitGame; break;},
+                        _ => (),
+                    };
+                    if (time::get_time() - last_time) > SPEED {
+                        snake.set_direction(&new_direction);
+                        match snake.move_forward((food.x, food.y)) {
+                            0 => (),
+                            1 => {
+                                food = Food {..Default::default()};
+                                score += 1;},
+                            2 => { println!("went out of bounds");
+                                state = State::GameOver;
+                                break;},
+                            _ => panic!("move_forward returned unexpected number"),
+                        }
+                        last_time = time::get_time();
+                    }
+                    // render game
+                    window::clear_background(color::BEIGE);
+                    text::draw_text(&score.to_string(), window::screen_width()/2.0, 35.0, 60.0, color::BLACK);
+                    for y in 0..GAME_HEIGHT {
+                        for x in 0..GAME_WIDTH {
+                            shapes::draw_rectangle_lines((x as f32)*scale+X_OFFSET, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
+                        }
+                    }
+                    snake.draw(scale);
+                    shapes::draw_rectangle((food.x as f32)*scale+X_OFFSET, (food.y as f32)*scale+Y_OFFSET, scale, scale,color::YELLOW);
+                    window::next_frame().await;
+                    thread::sleep(Duration::from_millis(12));
                 }
-                last_time = time::get_time();
-            }
-            // render game
-            window::clear_background(color::BEIGE);
-            text::draw_text(&score.to_string(), window::screen_width()/2.0, 35.0, 60.0, color::BLACK);
-            for y in 0..GAME_HEIGHT {
-                for x in 0..GAME_WIDTH {
-                    shapes::draw_rectangle_lines((x as f32)*scale+X_OFFSET, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
+            },
+
+            State::GameOver => {
+                loop {
+                    //Proccess input
+                    match input::get_last_key_pressed() {
+                        Some(input::KeyCode::Escape) => {state = State::ExitGame; break;},
+                        Some(input::KeyCode::R) => {state = State::SnakeLoop; break;},
+                        _ => (),
+                    };
+                    window::clear_background(color::BEIGE);
+                    text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
+                    text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
+                    text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
+                    window::next_frame().await;
+                    thread::sleep(Duration::from_millis(12));
                 }
             }
-            snake.draw(scale);
-            shapes::draw_rectangle((food.x as f32)*scale+X_OFFSET, (food.y as f32)*scale+Y_OFFSET, scale, scale,color::YELLOW);
-            window::next_frame().await;
-            thread::sleep(Duration::from_millis(12));
-        }},
-        _ => (),
+            _ => break,
+        }
     }
-    // render
-    // else {
-    //     text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
-    //     text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
-    //     text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
-    // }
-   
-    // sleeps
+
 }
 struct Food {
     x: i32,
@@ -126,11 +141,10 @@ impl Snake {
             Direction::Up => Direction::Down,
             Direction::Down => Direction::Up
         };
-        if opposite_dir == *dir {
-            println!("Can't change to opposite direction!");
-        } else {
+        if opposite_dir != *dir {
             self.direction = dir.clone();
         }
+
     }
     fn move_forward (&mut self, food_pos: (i32, i32)) -> u8 {
         // return 0 if moved
