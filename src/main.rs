@@ -51,12 +51,25 @@ async fn main() {
             Some(input::KeyCode::Right) => new_direction = Direction::Right,
             Some(input::KeyCode::Up) => new_direction = Direction::Up,
             Some(input::KeyCode::Down) => new_direction = Direction::Down,
+            // This whole branch is garbage code I know
+            Some(input::KeyCode::R) => {game_objects = IndexMap::new();
+                                        snake = Snake {
+                                            head: (15,8),
+                                            direction: Direction::Up,
+                                            body: VecDeque::new(),};
+                                        let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT);
+                                        game_objects.insert((15,8), ObjectName::SnakeHead);
+                                        {let x = rnd_num%GAME_WIDTH;
+                                        let y = rnd_num/GAME_WIDTH;
+                                        game_objects.insert((x,y), ObjectName::Food);}
+                                        game_over = false;
+                                       },
             Some(input::KeyCode::Escape) => break,
             _ => (),
         }
         if !food_exists {
             loop {
-                let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT) as i32;
+                let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT);
                 let x = rnd_num%GAME_WIDTH;
                 let y = rnd_num/GAME_WIDTH;
                 if !game_objects.contains_key(&(x, y)) {
@@ -96,7 +109,8 @@ async fn main() {
         }
         else {
             text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
-            text::draw_text(&format!("Score: {}",score.to_string()), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
+            text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
+            text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
         }
         for (k,v) in &game_objects {
             match v {
@@ -152,8 +166,8 @@ impl Snake {
             Direction::Up => {self.head.1 -= 1;},
             Direction::Down => {self.head.1 += 1;},
         }
-        if (self.head.0 < 0 || self.head.0 >= GAME_WIDTH ||
-            self.head.1 < 0 || self.head.1 >= GAME_HEIGHT) {return 2;}
+        if self.head.0 < 0 || self.head.0 >= GAME_WIDTH ||
+            self.head.1 < 0 || self.head.1 >= GAME_HEIGHT {return 2;}
         match game.get_key_value(&self.head) {
             Some((_, ObjectName::Food)) => {
                 game.insert(self.head, ObjectName::SnakeHead);
