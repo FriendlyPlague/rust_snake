@@ -34,10 +34,8 @@ async fn main() {
     let scale: f32 = {
         let x_scale: f32 = window::screen_width()/GAME_WIDTH as f32 - X_OFFSET*2.0/GAME_WIDTH as f32;
         let y_scale: f32 = window::screen_height()/GAME_HEIGHT as f32 - Y_OFFSET*2.0/GAME_HEIGHT as f32;
-        let scale = {
-            if x_scale < y_scale {x_scale}
-            else {y_scale}};
-        scale
+        if x_scale < y_scale {x_scale}
+        else {y_scale}
     };
     loop {
         match state {
@@ -98,6 +96,7 @@ async fn main() {
                     text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
                     text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
                     text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
+                    text::draw_text("Press Esc to close", window::screen_width()/2.0-300.0, 600.0, 80.0, color::BLACK);
                     window::next_frame().await;
                     thread::sleep(Duration::from_millis(12));
                 }
