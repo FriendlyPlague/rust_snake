@@ -46,6 +46,7 @@ async fn main() {
                 let mut food: Food = Food {..Default::default()};
                 let mut last_time = time::get_time();
                 let mut new_direction: Direction = Direction::Left;
+                score = 0;
                 loop {
                     //Proccess input
                     match input::get_last_key_pressed() {
@@ -63,8 +64,8 @@ async fn main() {
                             1 => {
                                 food = Food {..Default::default()};
                                 score += 1;},
-                            2 => { println!("went out of bounds");
-                                state = State::GameOver;
+                            2 => 
+                                {state = State::GameOver;
                                 break;},
                             _ => panic!("move_forward returned unexpected number"),
                         }
