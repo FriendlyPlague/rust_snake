@@ -1,165 +1,156 @@
-use std::{thread,time::Duration};
-use std::collections::VecDeque;
-use macroquad::{window,shapes,color, input, time, text,rand};
-use indexmap::IndexMap;
+/// Snake written in Rust
+// TODO!: Fix rendering scaling
 
-const GAME_WIDTH: i32 = 32;
-const GAME_HEIGHT: i32 = 18;
+
+use std::{thread,time::Duration};
+use macroquad::{window,shapes,color, input, time, text,rand};
+
+const GAME_WIDTH: i32 = 20;
+const GAME_HEIGHT: i32 = 15;
 const SPEED: f64 = 0.1;
 const Y_OFFSET: f32 = 50.0;
-const X_OFFSET: f32 = 30.0;
+const X_OFFSET: f32 = 50.0;
 
 fn window_conf() -> window::Conf {
     window::Conf {
         window_title: "Snake".to_owned(),
-        window_width: 1280,
-        window_height: 720,
+        window_width: 1200,
+        window_height: 900,
         window_resizable: false,
         ..Default::default()
     }
 }
 
+enum State {
+    StartMenu,
+    SnakeLoop,
+    GameOver,
+    ExitGame,
+}
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut game_objects: IndexMap<(i32,i32),ObjectName> = IndexMap::new();
-    let mut snake: Snake = Snake {
-        head: (15,8), // starting location for snake
-        direction: Direction::Up,
-        body: VecDeque::new(),
-    };
-    game_objects.insert((15,8), ObjectName::SnakeHead);
-    // used to scale up game to better fit screen size
-    let scale = {
-        let x_scale: f32 = window::screen_width()/(GAME_WIDTH+1) as f32;
-        let y_scale: f32 = window::screen_height()/(GAME_HEIGHT+2) as f32;
+    let mut state = State::SnakeLoop;
+    let mut score: i32 = 0;
+    let scale: f32 = {
+        let x_scale: f32 = window::screen_width()/GAME_WIDTH as f32 - X_OFFSET*2.0/GAME_WIDTH as f32;
+        let y_scale: f32 = window::screen_height()/GAME_HEIGHT as f32 - Y_OFFSET*2.0/GAME_HEIGHT as f32;
         let scale = {
             if x_scale < y_scale {x_scale}
             else {y_scale}};
-        if scale < 10.0 {10.0}
-        else {scale}
+        scale
     };
-
-    let mut score: i32 = 1;
-    let mut last_time = time::get_time();
-    let mut new_direction = Direction::Up;
-    let mut food_exists = false;
-    let mut game_over = false;
     loop {
-        //Proccess input
-        match input::get_last_key_pressed() {
-            Some(input::KeyCode::Left) => new_direction = Direction::Left,
-            Some(input::KeyCode::Right) => new_direction = Direction::Right,
-            Some(input::KeyCode::Up) => new_direction = Direction::Up,
-            Some(input::KeyCode::Down) => new_direction = Direction::Down,
-            // This whole branch is garbage code I know
-            Some(input::KeyCode::R) => {game_objects = IndexMap::new();
-                                        snake = Snake {
-                                            head: (15,8),
-                                            direction: Direction::Up,
-                                            body: VecDeque::new(),};
-                                        let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT);
-                                        game_objects.insert((15,8), ObjectName::SnakeHead);
-                                        {let x = rnd_num%GAME_WIDTH;
-                                        let y = rnd_num/GAME_WIDTH;
-                                        game_objects.insert((x,y), ObjectName::Food);}
-                                        game_over = false;
-                                       },
-            Some(input::KeyCode::Escape) => break,
-            _ => (),
-        }
-        if !food_exists {
-            loop {
-                let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT);
-                let x = rnd_num%GAME_WIDTH;
-                let y = rnd_num/GAME_WIDTH;
-                if !game_objects.contains_key(&(x, y)) {
-                    game_objects.insert((x,y), ObjectName::Food);
-                    break;
+        match state {
+            State::SnakeLoop => {
+                let mut snake: Snake = Snake {..Default::default()};
+                let mut food: Food = Food {..Default::default()};
+                let mut last_time = time::get_time();
+                let mut new_direction: Direction = Direction::Left;
+                loop {
+                    //Proccess input
+                    match input::get_last_key_pressed() {
+                        Some(input::KeyCode::Left) => new_direction = Direction::Left,
+                        Some(input::KeyCode::Right) => new_direction = Direction::Right,
+                        Some(input::KeyCode::Up) => new_direction = Direction::Up,
+                        Some(input::KeyCode::Down) => new_direction = Direction::Down,
+                        Some(input::KeyCode::Escape) => {state = State::ExitGame; break;},
+                        _ => (),
+                    };
+                    if (time::get_time() - last_time) > SPEED {
+                        snake.set_direction(&new_direction);
+                        match snake.move_forward((food.x, food.y)) {
+                            0 => (),
+                            1 => {
+                                food = Food {..Default::default()};
+                                score += 1;},
+                            2 => { println!("went out of bounds");
+                                state = State::GameOver;
+                                break;},
+                            _ => panic!("move_forward returned unexpected number"),
+                        }
+                        last_time = time::get_time();
+                    }
+                    // render game
+                    window::clear_background(color::BEIGE);
+                    text::draw_text(&score.to_string(), window::screen_width()/2.0, 35.0, 60.0, color::BLACK);
+                    for y in 0..GAME_HEIGHT {
+                        for x in 0..GAME_WIDTH {
+                            shapes::draw_rectangle_lines((x as f32)*scale+X_OFFSET, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
+                        }
+                    }
+                    snake.draw(scale);
+                    shapes::draw_rectangle((food.x as f32)*scale+X_OFFSET, (food.y as f32)*scale+Y_OFFSET, scale, scale,color::YELLOW);
+                    window::next_frame().await;
+                    thread::sleep(Duration::from_millis(12));
+                }
+            },
+
+            State::GameOver => {
+                loop {
+                    //Proccess input
+                    match input::get_last_key_pressed() {
+                        Some(input::KeyCode::Escape) => {state = State::ExitGame; break;},
+                        Some(input::KeyCode::R) => {state = State::SnakeLoop; break;},
+                        _ => (),
+                    };
+                    window::clear_background(color::BEIGE);
+                    text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
+                    text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
+                    text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
+                    window::next_frame().await;
+                    thread::sleep(Duration::from_millis(12));
                 }
             }
-            food_exists = true;
+            _ => break,
         }
-        //update game objects
-        if !game_over && (time::get_time() - last_time) > SPEED {
-            last_time = time::get_time();
-            snake.set_direction(new_direction.clone());
+    }
 
-            let result = snake.move_forward(&mut game_objects);
-            if result == 1 {
-                println!("Food eaten!");
-                food_exists = false;
-                score += 1;
-            }
-            else if result == 2 {
-                println!("YOU DIED!");
-                game_objects.clear();
-                game_over = true;
-            }
-        }
+}
+struct Food {
+    x: i32,
+    y: i32,
+}
 
-        // render
-        window::clear_background(color::BEIGE);
-        if !game_over {
-            text::draw_text(&score.to_string(), window::screen_width()/2.0, 35.0, 60.0, color::BLACK);
-            for y in 0..GAME_HEIGHT {
-                for x in 0..GAME_WIDTH {
-                    shapes::draw_rectangle_lines((x as f32)*scale+X_OFFSET, (y as f32)*scale+Y_OFFSET, scale, scale,2.0,color::BLACK);
-                }
-            }
-        }
-        else {
-            text::draw_text("YOU DIED!", window::screen_width()/2.0-150.0, 250.0, 100.0, color::RED);
-            text::draw_text(&format!("Score: {}",score), window::screen_width()/2.0-150.0, 350.0, 100.0, color::BLACK);
-            text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
-        }
-        for (k,v) in &game_objects {
-            match v {
-                ObjectName::SnakeHead | ObjectName::SnakeSeg => {shapes::draw_rectangle((k.0 as f32)*scale+X_OFFSET, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);},
-                ObjectName::Food => {shapes::draw_rectangle((k.0 as f32)*scale+X_OFFSET, (k.1 as f32)*scale+Y_OFFSET, scale,scale, color::YELLOW);},
-            }
-        }
-        window::next_frame().await;
-        // sleeps
-        thread::sleep(Duration::from_millis(12));
+impl Default for Food {
+    fn default() -> Self {
+        let rnd_num = rand::gen_range(0,GAME_WIDTH*GAME_HEIGHT);
+        let rx = rnd_num%GAME_WIDTH;
+        let ry = rnd_num/GAME_WIDTH;
+        Food {x: rx, y: ry}
     }
 }
-
-#[derive(Copy,Clone)]
-enum ObjectName {
-    Food,
-    SnakeHead,
-    SnakeSeg,
-}
-
 struct Snake {
-    head: (i32,i32),
+    head: (i32,i32), // X and Y
     direction: Direction,
-    body: VecDeque<(i32,i32)>,
+    body: Vec<(i32,i32)>,
 }
-
+impl Default for Snake {
+    fn default() -> Self {
+        Snake {
+            head: (GAME_WIDTH/2,GAME_HEIGHT/2),
+            direction: Direction::Right,
+            body: Vec::new()
+        }
+    }
+}
 impl Snake {
-    fn set_direction(&mut self,dir: Direction) {
+    fn set_direction(&mut self,dir: &Direction) {
         let opposite_dir = match self.direction {
             Direction::Left => Direction::Right,
             Direction::Right => Direction::Left,
             Direction::Up => Direction::Down,
             Direction::Down => Direction::Up
         };
-        if opposite_dir == dir {
-            println!("Can't change to opposite direction!");
-        } else {
-            self.direction = dir;
+        if opposite_dir != *dir {
+            self.direction = dir.clone();
         }
+
     }
-    fn move_forward (&mut self, game: &mut IndexMap<(i32,i32),ObjectName>) -> u16 {
-        // 0 = moving freely
-        // 1 = eating food and growing
-        // 2 = dying
-        // add segment with previous pos
-        self.body.push_back(self.head);
-        game.remove(&self.head);
-        game.insert(self.head, ObjectName::SnakeSeg);
-        // move forward
+    fn move_forward (&mut self, food_pos: (i32, i32)) -> u8 {
+        // return 0 if moved
+        // return 1 if ate food
+        // return 2 if dead
+        self.body.insert(0,self.head);
         match self.direction {
             Direction::Left => {self.head.0 -= 1;},
             Direction::Right => {self.head.0 += 1;},
@@ -168,23 +159,22 @@ impl Snake {
         }
         if self.head.0 < 0 || self.head.0 >= GAME_WIDTH ||
             self.head.1 < 0 || self.head.1 >= GAME_HEIGHT {return 2;}
-        match game.get_key_value(&self.head) {
-            Some((_, ObjectName::Food)) => {
-                game.insert(self.head, ObjectName::SnakeHead);
-                1},
-            Some(_) => 2,
-            None => {// deletes end seg
-                    game.insert(self.head, ObjectName::SnakeHead);
-                    game.remove(self.body.front().unwrap());
-                    self.body.pop_front();
-                    0}
+        if self.head != food_pos {
+            self.body.pop();
+            return 0;
         }
-
+        1
+    }
+    fn draw(&self, scale: f32) {
+        shapes::draw_rectangle((self.head.0 as f32)*scale+X_OFFSET, (self.head.1 as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);
+        for (x, y) in &self.body {
+            shapes::draw_rectangle((*x as f32)*scale+X_OFFSET, (*y as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);
+        }
     }
 
 }
 
-#[derive(PartialEq,Clone)]
+#[derive(PartialEq,Clone, Debug)]
 enum Direction {
     Left,
     Right,
