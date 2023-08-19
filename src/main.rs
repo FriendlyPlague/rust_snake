@@ -3,7 +3,7 @@
 
 
 use std::{thread,time::Duration};
-use macroquad::{window,shapes,color, input, time, text,rand};
+use macroquad::{window,shapes,color, input, time, text,rand, miniquad::date};
 
 const GAME_WIDTH: i32 = 20;
 const GAME_HEIGHT: i32 = 15;
@@ -37,8 +37,12 @@ async fn main() {
         if x_scale < y_scale {x_scale}
         else {y_scale}
     };
+    rand::srand(date::now() as u64);
     loop {
         match state {
+            State::StartMenu => {
+                
+            }
             State::SnakeLoop => {
                 let mut snake: Snake = Snake {..Default::default()};
                 let mut food: Food = Food {..Default::default()};
@@ -98,7 +102,7 @@ async fn main() {
                     text::draw_text("Press R to restart", window::screen_width()/2.0-350.0, 500.0, 100.0, color::BLACK);
                     text::draw_text("Press Esc to close", window::screen_width()/2.0-300.0, 600.0, 80.0, color::BLACK);
                     window::next_frame().await;
-                    thread::sleep(Duration::from_millis(12));
+                    thread::sleep(Duration::from_millis(15));
                 }
             }
             _ => break,
@@ -168,7 +172,7 @@ impl Snake {
     fn draw(&self, scale: f32) {
         shapes::draw_rectangle((self.head.0 as f32)*scale+X_OFFSET, (self.head.1 as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);
         for (x, y) in &self.body {
-            shapes::draw_rectangle((*x as f32)*scale+X_OFFSET, (*y as f32)*scale+Y_OFFSET, scale,scale, color::GREEN);
+            shapes::draw_rectangle((*x as f32)*scale+X_OFFSET, (*y as f32)*scale+Y_OFFSET, scale,scale, color::LIME);
         }
     }
 
